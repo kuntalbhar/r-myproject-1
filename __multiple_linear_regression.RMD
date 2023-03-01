@@ -1,0 +1,143 @@
+---
+title: "aaa"
+author: "kuntal"
+date: "2/15/2023"
+output: pdf_document
+---
+
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+# Multiple Linear Regression
+
+# Importing the dataset
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+dataset = read.csv('50_Startups.csv')
+```
+# Encoding categorical data
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+dataset$State = factor(dataset$State,
+                    levels=c('New York', 'California', 'Florida'),
+                    labels=c(1,2,3))
+```
+# Splitting the dataset into the Training set and Test set
+# install.packages('caTools')
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+library(caTools)
+set.seed(123)
+split = sample.split(dataset$Profit, SplitRatio = 0.8 )
+training_set = subset(dataset,split== TRUE )
+test_set = subset(dataset,split== FALSE )
+```
+
+# Feature Scaling
+# training_set = scale(training_set)
+# test_set = scale(test_set)
+
+# Fitting Multiple Linear Regression to the Training set
+
+# can be also written as if you want selected independent columns and . for all columns
+#regressor = lm(formula = Profit ~ R.D.Spend + Administration + Marketing.Spend + State, 
+#               training_set)
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+regressor = lm(formula = Profit ~ . ,
+               data = training_set)
+
+summary(regressor)
+```
+#Analizing the result of summery coffecient we see R.D.Spend has the maximum effect as P-value is minimum and has 
+# "***" statistical significance
+# that gives the benefit that we can also use simple linear regression for faster process 
+#like  formula = Profit ~ R.D.Spend that will be ok and will give same prediction
+
+
+# Predicting the Test set results
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+y_pred = predict(regressor, newdata = test_set)
+```
+
+#building optimum modal using backward elimination
+
+#Backward Elimination 
+#Step1 - select significance level (SL) to stay in the modal (eg SL =.05)
+#Step2 - fit the full modal with all possible predictor
+#Step3 - consider the predictor with the highest P-Value. if P > SL go to step 4 otherwise go to FIN  (finish Modal is ready)  
+#Step4 - remove the predictor 
+#Step5 - fit the modal without the variable* (Note* means rebuild the modal again so if 100 after remove its 99 you have the rebuild the modal with 99 variable) go 		  back to Step 3 till (not P > SL)
+
+#you can take training set also instead of whole dataset
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+regressor = lm(formula = Profit ~ R.D.Spend + Administration + Marketing.Spend + State, 
+               data = dataset)
+
+summary(regressor)
+```
+#remove independent variable one by one where P-value > than .05 or 5% in Coefficients
+#first remove State has very high  P-value 99% and 93% no  statistical significance or impact on dependent variable Profit  
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+regressor = lm(formula = Profit ~ R.D.Spend + Administration + Marketing.Spend, 
+               data = dataset)
+
+summary(regressor)
+```
+#remove Administration has very high P-values %60 no statistical significance or impact on dependent variable Profit  
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+regressor = lm(formula = Profit ~ R.D.Spend +  Marketing.Spend, 
+               data = dataset)
+summary(regressor)
+
+y_pred = predict(regressor, newdata = test_set)
+y_pred
+```
+
+#You can see  R.D.Spend excellent impact on Profit 
+# but now you can also see Marketing.Spend has some  statistical significance 
+#remove Marketing.Spend as it is > 5% following strictly the elimination rules
+#Note You may think about it to keep also
+
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+regressor = lm(formula = Profit ~ R.D.Spend, 
+               data = dataset)
+summary(regressor)
+y_pred = predict(regressor, newdata = test_set)
+y_pred
+```
+
+#Note: So  final modal is either based on one independent variable R.D.Spend or
+# team with R.D.Spend +Marketing.Spend depending upon your choice
+# now need check adjusted R squared and  R squared and 
+# then choose based on adjusted R squared  near to 1 for best modal
+
+# Note:Coefficient are correlated to between dependent and independent variable 
+# these are measured per unit. since here we are talking in dollars
+# +ve mean increase and -ve means decrease
+# R.D.Spend per unit(dollar) increase the profit per unit (in dollar) 
+# by 7.9 cent and similarly for marketing. Always treat it as Per Unit both variable
+
+#Also Coefficient talk about the additional effect of every single variable
+# given that the other variable already in place. example here R.D.Spend already 
+# in the modal and Marketing.Spend give additional effect
+ 
+###Automated Code for Backward Elimination
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+backwardElimination <- function(x, sl) {
+  numVars = length(x)
+  for (i in c(1:numVars)){
+    regressor = lm(formula = Profit ~ ., data = x)
+    maxVar = max(coef(summary(regressor))[c(2:numVars), "Pr(>|t|)"])
+    if (maxVar > sl){
+      j = which(coef(summary(regressor))[c(2:numVars), "Pr(>|t|)"] == maxVar)
+      x = x[, -j]
+    }
+    numVars = numVars - 1
+  }
+  return(summary(regressor))
+}
+
+SL = 0.05
+dataset = dataset[, c(1,2,3,4,5)]
+backwardElimination(training_set, SL)
+```
